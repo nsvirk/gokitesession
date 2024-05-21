@@ -1,0 +1,31 @@
+
+
+@user_id = {{ $processEnv %KITE_USER_ID }}
+@password = {{ $processEnv %KITE_PASSWORD }}
+
+@loginUserId = {{login.response.body.data.user_id}}
+@loginRequestId = {{login.response.body.data.request_id}}
+@loginTwofaType = {{login.response.body.data.twofa_type}}
+
+### #####################################
+# @name login
+
+POST https://kite.zerodha.com/api/login HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+&user_id={{user_id}}
+&password={{password}}
+
+### #####################################
+# @name twofa
+# @prompt twofa_value Get from Authenticator app
+
+POST https://kite.zerodha.com/api/twofa HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+&user_id={{ loginUserId }}
+&request_id={{ loginRequestId }}
+&twofa_type={{ loginTwofaType }}
+&twofa_value={{ twofa_value }}
+
+### #####################################
