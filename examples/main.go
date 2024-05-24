@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	kitesession "github.com/nsvirk/gokitesession"
@@ -25,9 +24,10 @@ func main() {
 	// Generate totp value
 	totpValue, err := ks.GenerateTotpValue(totpSecret)
 	if err != nil {
-		log.Printf("Error generating totp value: %v", err)
+		fmt.Printf("Error generating totp value: %v", err)
 		return
 	}
+
 	// Check the inputs values
 	fmt.Println("--------------------------------------------------------------")
 	fmt.Println("Kite User")
@@ -40,7 +40,7 @@ func main() {
 	// Get kite session data
 	session, err := ks.GenerateSession(password, totpValue)
 	if err != nil {
-		log.Printf("Error generating session: %v", err)
+		fmt.Printf("Error generating session: %v", err)
 		return
 	}
 
@@ -59,7 +59,12 @@ func main() {
 	// fmt.Println(session)
 
 	// Check if the enctoken is valid
-	isValid := ks.CheckEnctokenValid(session.Enctoken)
+	isValid, err := ks.CheckEnctokenValid(session.Enctoken)
+	if err != nil {
+		fmt.Printf("Error checking enctoken valid: %v", err)
+		return
+	}
+
 	fmt.Println("--------------------------------------------------------------")
 	fmt.Println("Check Enctoken Valid")
 	fmt.Println("--------------------------------------------------------------")

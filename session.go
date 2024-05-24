@@ -359,7 +359,7 @@ func (c *Client) doTwofa(totpValue string, loginResponse *loginResponse) (*Sessi
 }
 
 // CheckEnctokenValid checks if the enctoken is valid or not.
-func (c *Client) CheckEnctokenValid(enctoken string) bool {
+func (c *Client) CheckEnctokenValid(enctoken string) (bool, error) {
 
 	// Set the enctoken to the instance
 	c.SetEnctoken(enctoken)
@@ -371,7 +371,7 @@ func (c *Client) CheckEnctokenValid(enctoken string) bool {
 		if c.debug {
 			log.Printf("Error creating profile request: %v", err)
 		}
-		return false
+		return false, err
 	}
 
 	// set headers
@@ -385,10 +385,11 @@ func (c *Client) CheckEnctokenValid(enctoken string) bool {
 		if c.debug {
 			log.Printf("Error making profile request: %v", err)
 		}
-		return false
+		return false, err
 	}
 
 	// return the result based on http status code
-	return resp.StatusCode == http.StatusOK
+	tokenValid := resp.StatusCode == http.StatusOK
+	return tokenValid, nil
 
 }
