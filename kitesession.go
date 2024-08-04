@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/pquerna/otp/totp"
 )
 
 const (
@@ -252,4 +254,9 @@ type errorResponse struct {
 	Status    string `json:"status"`
 	Message   string `json:"message"`
 	ErrorType string `json:"error_type"`
+}
+
+// GenerateTOTPValue generates a TOTP value using the provided secret.
+func GenerateTOTPValue(totpSecret string) (string, error) {
+	return totp.GenerateCode(totpSecret, time.Now())
 }

@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	kitesession "github.com/nsvirk/gokitesession"
-	"github.com/pquerna/otp/totp"
 )
 
 // Config holds the configuration data for the Kite session.
@@ -16,11 +14,6 @@ type Config struct {
 	UserID     string
 	Password   string
 	TOTPSecret string
-}
-
-// GenerateTOTPValue generates a TOTP value using the provided secret.
-func GenerateTOTPValue(totpSecret string) (string, error) {
-	return totp.GenerateCode(totpSecret, time.Now())
 }
 
 func main() {
@@ -35,7 +28,7 @@ func main() {
 	ks.SetDebug(false)
 
 	// Generate TOTP value
-	totpValue, err := GenerateTOTPValue(config.TOTPSecret)
+	totpValue, err := kitesession.GenerateTOTPValue(config.TOTPSecret)
 	if err != nil {
 		log.Fatalf("Error generating TOTP value: %v", err)
 	}

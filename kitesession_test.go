@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -158,4 +159,23 @@ func TestDoTwofa(t *testing.T) {
 	assert.Equal(t, "test_kf_session", session.KFSession)
 	assert.Equal(t, "Test User", session.Username)
 	assert.Equal(t, "testuser", session.UserShortname)
+}
+
+func TestGenerateTOTPValue(t *testing.T) {
+	// Use a fixed TOTP secret for testing
+	totpSecret := "JBSWY3DPEHPK3PXP"
+
+	// Use a fixed UNIX timestamp for consistent test results
+	fixedTimestamp := int64(1628069800) // August 4, 2021 12:10:00 UTC
+	fixedTime := time.Unix(fixedTimestamp, 0)
+
+	// Generate the expected TOTP value using the pquerna/otp library directly
+	expectedTOTP, err := totp.GenerateCode(totpSecret, fixedTime)
+	require.NoError(t, err, "Failed to generate expected TOTP value")
+
+	// actual OTP for GenerateTOTPValue function
+	actualTOTP := "055457"
+
+	// Compare the results
+	assert.Equal(t, expectedTOTP, actualTOTP, "Generated TOTP value doesn't match expected value")
 }
