@@ -145,3 +145,20 @@ export KS_API_PORT=3008
 go build -o kitesession_api api/api.go
 ./kitesession_api
 ```
+
+### API Endpoints
+
+- **POST `/session/totp`**
+
+  - Request Body: JSON object with `totp_secret` field
+  - Response: JSON object with `totp_value` field
+
+- **POST `/session/login`**
+
+  - Request Body: JSON object with `user_id`, `password`, and `totp_value` fields
+  - Response: JSON object with session information
+
+- **POST `/session/valid`**
+
+  - Request Body: JSON object with `enctoken` field
+  - Response: JSON object with `is_valid` field
