@@ -1,0 +1,45 @@
+@baseUrl = http://127.0.0.1:8080/session
+@user_id = {{ $processEnv %KITE_USER_ID }}
+@password = {{ $processEnv %KITE_PASSWORD }}
+@totp_secret = {{ $processEnv %KITE_TOTP_SECRET }}
+
+@totp_value = {{totp.response.body.data.totp_value}}
+
+@enctoken = {{login.response.body.data.enctoken}}
+
+### -------------------------------------
+### Generate TOTP
+### -------------------------------------
+# @name totp
+POST {{baseUrl}}/totp
+Content-Type: application/json
+
+{
+    "totp_secret": "{{totp_secret}}"
+}
+
+
+### -------------------------------------
+### Login
+### -------------------------------------
+# @name login
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+    "user_id": "{{user_id}}",
+    "password": "{{password}}",
+    "totp_value": "{{totp_value}}"
+}
+
+### -------------------------------------
+### Check Enctoken Validity
+### -------------------------------------
+POST {{baseUrl}}/valid
+Content-Type: application/json
+
+{
+    "enctoken": "{{enctoken}}"
+}
+
+### -------------------------------------

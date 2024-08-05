@@ -1,8 +1,10 @@
-# Kite API Session Client
+# Kite API Session Library
 
-> The Go client to generate user tokens automatically for using with KiteConnect and Kiteticker API.
+> The Go package to generate authentication tokens automatically for using with KiteConnect and Kiteticker API.
+> Can be used as a standalone library in other Go apps.
+> Can be used as a API service.
 
-## Usage Instructions
+## Usage Instructions as a standalone library
 
 ### Required:
 
@@ -132,4 +134,14 @@ func printEnctokenValidity(isValid bool) {
 	fmt.Println("--------------------------------------------------------------")
 }
 
+```
+
+## Usage Instructions as API service
+
+```go
+go run api/api.go
+// or
+export KS_API_PORT=3008
+go build -o kitesession_api api/api.go
+./kitesession_api
 ```
