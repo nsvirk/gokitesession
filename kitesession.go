@@ -27,14 +27,14 @@ const (
 	uriUserProfile = "/oms/user/profile"
 )
 
-// Session represents the Kite session data.
-type Session struct {
-	UserID        string `json:"user_id"`
-	Username      string `json:"user_name"`
+// KiteSession represents the Kite session data.
+type KiteSession struct {
+	UserId        string `json:"user_id"`
+	UserName      string `json:"user_name"`
 	UserShortname string `json:"user_shortname"`
-	AvatarURL     string `json:"avatar_url"`
+	AvatarUrl     string `json:"avatar_url"`
 	PublicToken   string `json:"public_token"`
-	KFSession     string `json:"kf_session"`
+	KfSession     string `json:"kf_session"`
 	Enctoken      string `json:"enctoken"`
 	LoginTime     string `json:"login_time"`
 }
@@ -78,8 +78,8 @@ func (c *Client) SetTimeout(timeout time.Duration) {
 	c.httpClient.Timeout = timeout
 }
 
-// GenerateSession generates a new Kite session using the provided credentials.
-func (c *Client) GenerateSession(userID, password, totpValue string) (*Session, error) {
+// GenerateSession generates a new Kite session using the provided credntials.
+func (c *Client) GenerateSession(userID, password, totpValue string) (*KiteSession, error) {
 	loginResp, err := c.doLogin(userID, password)
 	if err != nil {
 		return nil, fmt.Errorf("login failed: %w", err)
@@ -114,7 +114,7 @@ func (c *Client) doLogin(userID, password string) (*loginResponse, error) {
 }
 
 // doTwofa performs the two-factor authentication step of the authentication process.
-func (c *Client) doTwofa(userID, totpValue string, loginResp *loginResponse) (*Session, error) {
+func (c *Client) doTwofa(userID, totpValue string, loginResp *loginResponse) (*KiteSession, error) {
 	data := url.Values{
 		"user_id":     {userID},
 		"request_id":  {loginResp.Data.RequestID},
@@ -137,8 +137,8 @@ func (c *Client) doTwofa(userID, totpValue string, loginResp *loginResponse) (*S
 		return nil, fmt.Errorf("twofa request failed with status: %s", resp.Status)
 	}
 
-	session := &Session{
-		Username:      loginResp.Data.Profile.UserName,
+	kiteSession := &KiteSession{
+		UserName:      loginResp.Data.Profile.UserName,
 		UserShortname: loginResp.Data.Profile.UserShortname,
 		LoginTime:     time.Now().Format("2006-01-02 15:04:05"),
 	}
@@ -146,21 +146,21 @@ func (c *Client) doTwofa(userID, totpValue string, loginResp *loginResponse) (*S
 	for _, cookie := range resp.Cookies() {
 		switch cookie.Name {
 		case "user_id":
-			session.UserID = cookie.Value
+			kiteSession.UserId = cookie.Value
 		case "public_token":
-			session.PublicToken = cookie.Value
+			kiteSession.PublicToken = cookie.Value
 		case "kf_session":
-			session.KFSession = cookie.Value
+			kiteSession.KfSession = cookie.Value
 		case "enctoken":
-			session.Enctoken = cookie.Value
+			kiteSession.Enctoken = cookie.Value
 		}
 	}
 
-	if session.Enctoken == "" {
+	if kiteSession.Enctoken == "" {
 		return nil, fmt.Errorf("enctoken not found in response cookies")
 	}
 
-	return session, nil
+	return kiteSession, nil
 }
 
 // CheckEnctokenValid checks if the provided enctoken is valid.

@@ -52,6 +52,8 @@ func main() {
 	}))
 	// Add recovery middleware to handle panics
 	e.Use(middleware.Recover())
+	// CORS middleware
+	e.Use(middleware.CORS())
 
 	// Routes
 	e.POST("/session/totp", generateTOTP)

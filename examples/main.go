@@ -36,17 +36,17 @@ func main() {
 	// Print input values
 	printInputValues(config.UserID, config.Password, totpValue)
 
-	// Generate a new session
-	session, err := ks.GenerateSession(config.UserID, config.Password, totpValue)
+	// Generate a new kite session
+	kiteSession, err := ks.GenerateSession(config.UserID, config.Password, totpValue)
 	if err != nil {
 		log.Fatalf("Error generating session: %v", err)
 	}
 
 	// Print session information
-	printSessionInfo(session)
+	printSessionInfo(kiteSession)
 
 	// Check if the enctoken is valid
-	isValid, err := ks.CheckEnctokenValid(session.Enctoken)
+	isValid, err := ks.CheckEnctokenValid(kiteSession.Enctoken)
 	if err != nil {
 		log.Fatalf("Error checking enctoken validity: %v", err)
 	}
@@ -84,18 +84,18 @@ func printInputValues(userID, password, totpValue string) {
 }
 
 // printSessionInfo prints the session information.
-func printSessionInfo(session *kitesession.Session) {
+func printSessionInfo(kiteSession *kitesession.KiteSession) {
 	fmt.Println("--------------------------------------------------------------")
 	fmt.Println("Kite Session")
 	fmt.Println("--------------------------------------------------------------")
-	fmt.Printf("user_id        : %s\n", session.UserID)
-	fmt.Printf("public_token   : %s\n", session.PublicToken)
-	fmt.Printf("kf_session     : %s\n", session.KFSession)
-	fmt.Printf("enctoken       : %s\n", session.Enctoken)
-	fmt.Printf("login_time     : %s\n", session.LoginTime)
-	fmt.Printf("username       : %s\n", session.Username)
-	fmt.Printf("user_shortname : %s\n", session.UserShortname)
-	fmt.Printf("avatar_url     : %s\n\n", session.AvatarURL)
+	fmt.Printf("user_id        : %s\n", kiteSession.UserId)
+	fmt.Printf("user_name      : %s\n", kiteSession.UserName)
+	fmt.Printf("user_shortname : %s\n", kiteSession.UserShortname)
+	fmt.Printf("enctoken       : %s\n", kiteSession.Enctoken)
+	fmt.Printf("public_token   : %s\n", kiteSession.PublicToken)
+	fmt.Printf("kf_session     : %s\n", kiteSession.KfSession)
+	fmt.Printf("login_time     : %s\n", kiteSession.LoginTime)
+	fmt.Printf("avatar_url     : %s\n\n", kiteSession.AvatarUrl)
 }
 
 // printEnctokenValidity prints whether the enctoken is valid.

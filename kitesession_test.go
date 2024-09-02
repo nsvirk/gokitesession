@@ -65,9 +65,9 @@ func TestGenerateSession(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, session)
 	assert.Equal(t, "test_enctoken", session.Enctoken)
-	assert.Equal(t, "test_user_id", session.UserID)
+	assert.Equal(t, "test_user_id", session.UserId)
 	assert.Equal(t, "test_public_token", session.PublicToken)
-	assert.Equal(t, "test_kf_session", session.KFSession)
+	assert.Equal(t, "test_kf_session", session.KfSession)
 }
 
 func TestCheckEnctokenValid(t *testing.T) {
@@ -154,10 +154,10 @@ func TestDoTwofa(t *testing.T) {
 	session, err := client.doTwofa("test_user", "123456", loginResp)
 	require.NoError(t, err)
 	assert.Equal(t, "test_enctoken", session.Enctoken)
-	assert.Equal(t, "test_user_id", session.UserID)
+	assert.Equal(t, "test_user_id", session.UserId)
 	assert.Equal(t, "test_public_token", session.PublicToken)
-	assert.Equal(t, "test_kf_session", session.KFSession)
-	assert.Equal(t, "Test User", session.Username)
+	assert.Equal(t, "test_kf_session", session.KfSession)
+	assert.Equal(t, "Test User", session.UserName)
 	assert.Equal(t, "testuser", session.UserShortname)
 }
 
