@@ -1,4 +1,3 @@
-// Package main provides an example of using the kitesession package.
 package main
 
 import (
@@ -6,103 +5,90 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	kitesession "github.com/nsvirk/gokitesession"
 )
 
-// Config holds the configuration data for the Kite session.
-type Config struct {
-	UserID     string
-	Password   string
-	TOTPSecret string
-}
-
 func main() {
-	// Get configuration from environment variables
-	config, err := getConfig()
+	user, err := getUser()
 	if err != nil {
-		log.Fatalf("Error getting configuration: %v", err)
+		log.Fatal(err)
+	}
+	printUser(user)
+
+	// Initialize kiteauth client
+	ka := kitesession.New(user.APIKey)
+
+	// Generate API session
+	apiSession, err := ka.GenerateUserSession(*user)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// Create a new Kite session client
-	ks := kitesession.New()
-	ks.SetDebug(false)
+	// Check if API session is valid
+	isAPISessionValid := ka.IsAccessTokenValid(apiSession.AccessToken)
 
-	// Generate TOTP value
-	totpValue, err := kitesession.GenerateTOTPValue(config.TOTPSecret)
+	// Clear API key and secret
+	user.APIKey = ""
+	user.APISecret = ""
+
+	// Generate OMS session
+	omsSession, err := ka.GenerateUserSession(*user)
 	if err != nil {
-		log.Fatalf("Error generating TOTP value: %v", err)
+		log.Fatal(err)
 	}
 
-	// Print input values
-	printInputValues(config.UserID, config.Password, totpValue)
+	// Check if OMS session is valid
+	isOMSSessionValid := ka.IsEnctokenValid(omsSession.Enctoken)
 
-	// Generate a new kite session
-	kiteSession, err := ks.GenerateSession(config.UserID, config.Password, totpValue)
-	if err != nil {
-		log.Fatalf("Error generating session: %v", err)
-	}
+	// Print API session
+	kitesession.PrintUserSession("API", apiSession)
+	kitesession.PrintAPISessionValid(isAPISessionValid)
 
-	// Print session information
-	printSessionInfo(kiteSession)
-
-	// Check if the enctoken is valid
-	isValid, err := ks.CheckEnctokenValid(kiteSession.Enctoken)
-	if err != nil {
-		log.Fatalf("Error checking enctoken validity: %v", err)
-	}
-
-	// Print enctoken validity
-	printEnctokenValidity(isValid)
+	// Print OMS session
+	kitesession.PrintUserSession("OMS", omsSession)
+	kitesession.PrintOMSSessionValid(isOMSSessionValid)
 
 }
 
-// getConfig retrieves the configuration from environment variables.
-func getConfig() (*Config, error) {
-	userID := os.Getenv("KITE_USER_ID")
+// getUser retrieves the user configuration from environment variables.
+func getUser() (*kitesession.User, error) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	userId := os.Getenv("KITE_USER_ID")
 	password := os.Getenv("KITE_PASSWORD")
-	totpSecret := os.Getenv("KITE_TOTP_SECRET")
+	twofaSecret := os.Getenv("KITE_TWOFA_SECRET")
+	apiKey := os.Getenv("KITE_API_KEY")
+	apiSecret := os.Getenv("KITE_API_SECRET")
 
-	if userID == "" || password == "" || totpSecret == "" {
-		return nil, fmt.Errorf("KITE_USER_ID, KITE_PASSWORD, and KITE_TOTP_SECRET environment variables must be set")
+	if userId == "" || password == "" || twofaSecret == "" {
+		return nil, fmt.Errorf("KITE_USER_ID, KITE_PASSWORD, and KITE_TWOFA_SECRET environment variables must be set")
 	}
 
-	return &Config{
-		UserID:     userID,
-		Password:   password,
-		TOTPSecret: totpSecret,
+	if apiKey == "" || apiSecret == "" {
+		return nil, fmt.Errorf("KITE_API_KEY and KITE_API_SECRET environment variables must be set")
+	}
+
+	return &kitesession.User{
+		UserId:      userId,
+		Password:    password,
+		TwoFaSecret: twofaSecret,
+		APIKey:      apiKey,
+		APISecret:   apiSecret,
 	}, nil
 }
 
-// printInputValues prints the input values used for authentication.
-func printInputValues(userID, password, totpValue string) {
+// printUser prints the user information.
+func printUser(user *kitesession.User) {
+	fmt.Println("================================================================")
+	fmt.Println("Kite User")
 	fmt.Println("--------------------------------------------------------------")
-	fmt.Println("User Inputs")
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Printf("User ID      	: %s\n", userID)
-	fmt.Printf("Password     	: %s\n", password)
-	fmt.Printf("TOTP Value   	: %s\n\n", totpValue)
-}
-
-// printSessionInfo prints the session information.
-func printSessionInfo(kiteSession *kitesession.KiteSession) {
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Println("Kite Session")
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Printf("user_id        : %s\n", kiteSession.UserId)
-	fmt.Printf("user_name      : %s\n", kiteSession.UserName)
-	fmt.Printf("user_shortname : %s\n", kiteSession.UserShortname)
-	fmt.Printf("enctoken       : %s\n", kiteSession.Enctoken)
-	fmt.Printf("public_token   : %s\n", kiteSession.PublicToken)
-	fmt.Printf("kf_session     : %s\n", kiteSession.KfSession)
-	fmt.Printf("login_time     : %s\n", kiteSession.LoginTime)
-	fmt.Printf("avatar_url     : %s\n\n", kiteSession.AvatarUrl)
-}
-
-// printEnctokenValidity prints whether the enctoken is valid.
-func printEnctokenValidity(isValid bool) {
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Println("Check Enctoken Valid")
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Printf("Enctoken Valid : %t\n\n", isValid)
-	fmt.Println("--------------------------------------------------------------")
+	fmt.Printf("User Id      	: %s\n", user.UserId)
+	fmt.Printf("Password     	: %s\n", user.Password)
+	fmt.Printf("TwoFa Secret  	: %s\n\n", user.TwoFaSecret)
+	fmt.Printf("API Key      	: %s\n", user.APIKey)
+	fmt.Printf("API Secret   	: %s\n\n", user.APISecret)
+	fmt.Println("================================================================")
 }
