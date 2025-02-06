@@ -21,7 +21,7 @@
 ## Installation
 
 ```
-go get github.com/nsvirk/gokiteauth
+go get github.com/nsvirk/gokitesession
 ```
 
 ## Sample code
