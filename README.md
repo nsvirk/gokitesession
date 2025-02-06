@@ -1,4 +1,4 @@
-# Kite API Authentication Library
+# Zerodha Kite User Session client
 
 > The Go package to generate authentication tokens automatically for using with KiteConnect and Kiteticker API.
 > Can be used as a standalone library in other Go apps.
