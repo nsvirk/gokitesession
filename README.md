@@ -29,3 +29,13 @@ go get github.com/nsvirk/gokitesession
 ```md
 See `examples/main.go`
 ```
+
+## Sample .env file
+
+```env
+KITE_USER_ID=
+KITE_PASSWORD=
+KITE_TOTP_SECRET=
+KITE_API_KEY=
+KITE_API_SECRET=
+```
