@@ -1,10 +1,10 @@
 module github.com/nsvirk/gokitesession
 
-go 1.24.1
+go 1.24.3
 
 require (
 	github.com/joho/godotenv v1.5.1
-	github.com/pquerna/otp v1.4.0
+	github.com/pquerna/otp v1.5.0
 )
 
 require (
