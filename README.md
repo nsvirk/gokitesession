@@ -21,7 +21,7 @@
 ## Import
 
 ```go
-go get github.com/nsvirk/gokitesession/v2
+go get github.com/nsvirk/gokitesession
 ```
 
 ## Sample code
