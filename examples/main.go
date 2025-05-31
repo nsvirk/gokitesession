@@ -9,7 +9,7 @@ import (
 	kitesession "github.com/nsvirk/gokitesession"
 )
 
-// Main function for demonstration
+// go run examples/main.go
 func main() {
 	// Load environment variables
 	err := godotenv.Load()
@@ -23,35 +23,34 @@ func main() {
 	apiKey := os.Getenv("KITE_API_KEY")
 	apiSecret := os.Getenv("KITE_API_SECRET")
 
-	printKiteUser(userId, password, totpSecret, apiKey, apiSecret)
-
 	if userId == "" || password == "" || totpSecret == "" {
 		log.Fatal("Missing environment variables")
 	}
 
-	client, err := kitesession.NewKiteSessionClient()
+	printKiteUser(userId, password, totpSecret, apiKey, apiSecret)
+
+	// generate kitesession
+	client, err := kitesession.NewClient()
 	if err != nil {
-		fmt.Printf("Error creating client: %v\n", err)
+		log.Fatal("Error creating client: ", err)
+	}
+
+	kiteSession, err := client.GenerateSession(userId, password, totpSecret, apiKey, apiSecret)
+	if err != nil {
+		fmt.Println("--------------------------------")
+		fmt.Printf("error: %+v\n", err)
+		fmt.Printf("error_code: %v\n", client.KiteSessionError.ErrorCode)
+		fmt.Printf("error_type: %v\n", client.KiteSessionError.ErrorType)
+		fmt.Printf("error_message: %v\n", client.KiteSessionError.Message)
+		fmt.Println("--------------------------------")
 		return
 	}
 
-	// Generate session
-	session, err := client.GenerateSession(userId, password, totpSecret, apiKey, apiSecret)
-	if err != nil {
-		fmt.Printf("Error generating session: %v\n", err)
-		return
-	}
-	printKiteSession(session)
-
-	// Validate session
-	isValid := client.IsValidEnctoken(session.Enctoken)
-	printOMSSessionValid(isValid)
-
-	isValid = client.IsValidAccessToken(apiKey, session.AccessToken)
-	printAPISessionValid(isValid)
+	printKiteSession(kiteSession)
 
 }
 
+// printKiteUser prints the kite user details
 func printKiteUser(userId, password, totpSecret, apiKey, apiSecret string) {
 	fmt.Println("--------------------------------------------------------------")
 	fmt.Println("Kite User")
@@ -64,6 +63,7 @@ func printKiteUser(userId, password, totpSecret, apiKey, apiSecret string) {
 	fmt.Println("")
 }
 
+// printKiteSession prints the kite session details
 func printKiteSession(ks *kitesession.KiteSession) {
 	fmt.Println("--------------------------------------------------------------")
 	if ks.APIKey == "" {
@@ -91,22 +91,5 @@ func printKiteSession(ks *kitesession.KiteSession) {
 	fmt.Printf("refresh_token  : %s\n", ks.RefreshToken)
 	fmt.Printf("meta           : %v\n", ks.Meta)
 	fmt.Println("")
-}
-
-func printOMSSessionValid(isValid bool) {
 	fmt.Println("--------------------------------------------------------------")
-	fmt.Println("Is OMS Session Valid")
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Printf("OMS Session Valid : %t\n", isValid)
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Println("")
-}
-
-func printAPISessionValid(isValid bool) {
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Println("Is API Session Valid")
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Printf("API Session Valid : %t\n", isValid)
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Println("")
 }
