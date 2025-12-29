@@ -1,6 +1,7 @@
 package kitesession
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -37,14 +38,18 @@ type SessionTokenResponse struct {
 	} `json:"data"`
 }
 
-// getSessID gets the sess_id from the login URL
-func (c *KiteSessionClient) getSessID() (string, string, error) {
+// getSessID gets the sess_id from the login URL with context support.
+// It initiates the API session flow and retrieves the session ID.
+func (c *KiteSessionClient) getSessID(ctx context.Context) (string, string, error) {
 	loginURL := fmt.Sprintf("%s?v=3&api_key=%s", ConnectLoginURL, c.APIKey)
 
 	loginRequest, err := http.NewRequest(http.MethodGet, loginURL, nil)
 	if err != nil {
 		return "", "", err
 	}
+
+	// add context to request
+	loginRequest = loginRequest.WithContext(ctx)
 
 	resp, err := c.client.Do(loginRequest)
 	if err != nil {
@@ -96,14 +101,18 @@ func (c *KiteSessionClient) getSessID() (string, string, error) {
 
 }
 
-// getRequestToken gets the request token from the finish URL
-func (c *KiteSessionClient) getRequestToken(sessID string) (string, error) {
+// getRequestToken gets the request token from the finish URL with context support.
+// It completes the authentication flow and retrieves the request token.
+func (c *KiteSessionClient) getRequestToken(ctx context.Context, sessID string) (string, error) {
 	finishURL := fmt.Sprintf("%s?v=3&api_key=%s&sess_id=%s", ConnectFinishURL, c.APIKey, sessID)
 
 	finishRequest, err := http.NewRequest(http.MethodGet, finishURL, nil)
 	if err != nil {
 		return "", err
 	}
+
+	// add context to request
+	finishRequest = finishRequest.WithContext(ctx)
 
 	resp, err := c.client.Do(finishRequest)
 	if err != nil {
@@ -143,8 +152,9 @@ func (c *KiteSessionClient) getRequestToken(sessID string) (string, error) {
 	return requestToken, nil
 }
 
-// generateSessionToken generates the session token
-func (c *KiteSessionClient) generateSessionToken(requestToken string) (*SessionTokenResponse, error) {
+// generateSessionToken generates the session token with context support.
+// It exchanges the request token for an access token.
+func (c *KiteSessionClient) generateSessionToken(ctx context.Context, requestToken string) (*SessionTokenResponse, error) {
 	// generate checksum
 	data := c.APIKey + requestToken + c.APISecret
 	hash := sha256.Sum256([]byte(data))
@@ -160,6 +170,9 @@ func (c *KiteSessionClient) generateSessionToken(requestToken string) (*SessionT
 	if err != nil {
 		return nil, err
 	}
+
+	// add context to request
+	tokenRequest = tokenRequest.WithContext(ctx)
 
 	for key, value := range defaultHeaders {
 		tokenRequest.Header.Set(key, value)
@@ -181,9 +194,8 @@ func (c *KiteSessionClient) generateSessionToken(requestToken string) (*SessionT
 	}
 
 	var sessionTokenResponse SessionTokenResponse
-	err = json.NewDecoder(resp.Body).Decode(&sessionTokenResponse)
-	if err != nil {
-		return nil, err
+	if err := json.NewDecoder(resp.Body).Decode(&sessionTokenResponse); err != nil {
+		return nil, fmt.Errorf("failed to decode session token response: %w", err)
 	}
 
 	return &sessionTokenResponse, nil

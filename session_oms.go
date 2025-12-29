@@ -1,6 +1,7 @@
 package kitesession
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,8 +67,9 @@ type KiteErrorResponse struct {
 	ErrorType string `json:"error_type"`
 }
 
-// doOMSSessionLogin does the login API call
-func (c *KiteSessionClient) doOMSSessionLogin() (*LoginResponse, []*http.Cookie, error) {
+// doOMSSessionLogin does the login API call with context support.
+// It performs the initial login step of the OMS session generation flow.
+func (c *KiteSessionClient) doOMSSessionLogin(ctx context.Context) (*LoginResponse, []*http.Cookie, error) {
 
 	// set login payload
 	payload := url.Values{}
@@ -80,6 +82,9 @@ func (c *KiteSessionClient) doOMSSessionLogin() (*LoginResponse, []*http.Cookie,
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// add context to request
+	loginRequest = loginRequest.WithContext(ctx)
 
 	// set default headers
 	for key, value := range defaultHeaders {
@@ -97,7 +102,14 @@ func (c *KiteSessionClient) doOMSSessionLogin() (*LoginResponse, []*http.Cookie,
 	// check if login is successful
 	if resp.StatusCode != http.StatusOK {
 		var kiteErrorResponse KiteErrorResponse
-		json.NewDecoder(resp.Body).Decode(&kiteErrorResponse)
+		if err := json.NewDecoder(resp.Body).Decode(&kiteErrorResponse); err != nil {
+			c.KiteSessionError = &KiteSessionError{
+				ErrorCode: resp.StatusCode,
+				ErrorType: "DecodeException",
+				Message:   fmt.Sprintf("failed to decode error response: %v", err),
+			}
+			return nil, nil, errors.New(c.KiteSessionError.Error())
+		}
 		c.KiteSessionError = &KiteSessionError{
 			ErrorCode: resp.StatusCode,
 			ErrorType: kiteErrorResponse.ErrorType,
@@ -108,13 +120,21 @@ func (c *KiteSessionClient) doOMSSessionLogin() (*LoginResponse, []*http.Cookie,
 
 	// parse response
 	var loginResponse LoginResponse
-	json.NewDecoder(resp.Body).Decode(&loginResponse)
+	if err := json.NewDecoder(resp.Body).Decode(&loginResponse); err != nil {
+		c.KiteSessionError = &KiteSessionError{
+			ErrorCode: 500,
+			ErrorType: "DecodeException",
+			Message:   fmt.Sprintf("failed to decode login response: %v", err),
+		}
+		return nil, nil, errors.New(c.KiteSessionError.Error())
+	}
 
 	return &loginResponse, resp.Cookies(), nil
 }
 
-// doOMSSessionTwoFA does the twofa API call
-func (c *KiteSessionClient) doOMSSessionTwoFA(requestID string) (*TwoFAResponse, []*http.Cookie, error) {
+// doOMSSessionTwoFA does the twofa API call with context support.
+// It performs the two-factor authentication step of the OMS session generation flow.
+func (c *KiteSessionClient) doOMSSessionTwoFA(ctx context.Context, requestID string) (*TwoFAResponse, []*http.Cookie, error) {
 	// generate twofa value
 	twofaValue, err := c.generateTwoFAValue()
 	if err != nil {
@@ -140,6 +160,9 @@ func (c *KiteSessionClient) doOMSSessionTwoFA(requestID string) (*TwoFAResponse,
 		return nil, nil, err
 	}
 
+	// add context to request
+	twoFaRequest = twoFaRequest.WithContext(ctx)
+
 	// add default headers
 	for key, value := range defaultHeaders {
 		twoFaRequest.Header.Add(key, value)
@@ -156,7 +179,14 @@ func (c *KiteSessionClient) doOMSSessionTwoFA(requestID string) (*TwoFAResponse,
 	// check if twofa is successful
 	if twoFaResponse.StatusCode != http.StatusOK {
 		var kiteErrorResponse KiteErrorResponse
-		json.NewDecoder(twoFaResponse.Body).Decode(&kiteErrorResponse)
+		if err := json.NewDecoder(twoFaResponse.Body).Decode(&kiteErrorResponse); err != nil {
+			c.KiteSessionError = &KiteSessionError{
+				ErrorCode: twoFaResponse.StatusCode,
+				ErrorType: "DecodeException",
+				Message:   fmt.Sprintf("failed to decode error response: %v", err),
+			}
+			return nil, nil, errors.New(c.KiteSessionError.Error())
+		}
 		c.KiteSessionError = &KiteSessionError{
 			ErrorCode: twoFaResponse.StatusCode,
 			ErrorType: kiteErrorResponse.ErrorType,
@@ -167,7 +197,14 @@ func (c *KiteSessionClient) doOMSSessionTwoFA(requestID string) (*TwoFAResponse,
 
 	// parse response
 	var twoFaResponseData TwoFAResponse
-	json.NewDecoder(twoFaResponse.Body).Decode(&twoFaResponseData)
+	if err := json.NewDecoder(twoFaResponse.Body).Decode(&twoFaResponseData); err != nil {
+		c.KiteSessionError = &KiteSessionError{
+			ErrorCode: 500,
+			ErrorType: "DecodeException",
+			Message:   fmt.Sprintf("failed to decode 2FA response: %v", err),
+		}
+		return nil, nil, errors.New(c.KiteSessionError.Error())
+	}
 
 	// return response and cookies
 	return &twoFaResponseData, twoFaResponse.Cookies(), nil
@@ -182,14 +219,18 @@ func (c *KiteSessionClient) generateTwoFAValue() (string, error) {
 	return otp, nil
 }
 
-// getUserProfile gets the user profile
-func (c *KiteSessionClient) getUserProfile() (*UserProfileResponse, error) {
+// getUserProfile gets the user profile with context support.
+// It retrieves detailed user information after successful authentication.
+func (c *KiteSessionClient) getUserProfile(ctx context.Context) (*UserProfileResponse, error) {
 
 	// make request
 	req, err := http.NewRequest(http.MethodGet, UserProfileURL, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	// add context to request
+	req = req.WithContext(ctx)
 
 	// add default headers
 	for key, value := range defaultHeaders {
@@ -209,33 +250,14 @@ func (c *KiteSessionClient) getUserProfile() (*UserProfileResponse, error) {
 
 	// check if user profile is successful
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("failed to get user profile")
+		return nil, fmt.Errorf("failed to get user profile: status code %d", resp.StatusCode)
 	}
 
 	// parse response
 	var userProfileResponse UserProfileResponse
-	json.NewDecoder(resp.Body).Decode(&userProfileResponse)
+	if err := json.NewDecoder(resp.Body).Decode(&userProfileResponse); err != nil {
+		return nil, fmt.Errorf("failed to decode user profile response: %w", err)
+	}
 
 	return &userProfileResponse, nil
-}
-
-// getStringFromAny safely converts any to string
-func getStringFromAny(v any) string {
-	if v == nil {
-		return ""
-	}
-	if str, ok := v.(string); ok {
-		return str
-	}
-	return ""
-}
-
-// getCookieValue gets the cookie value from the cookies
-func getCookieValue(cookies []*http.Cookie, name string) string {
-	for _, cookie := range cookies {
-		if cookie.Name == name {
-			return cookie.Value
-		}
-	}
-	return ""
 }

@@ -1,6 +1,30 @@
+// Package kitesession provides automated session token generation for Zerodha Kite API.
+//
+// This package handles the complete authentication flow including login, 2FA (TOTP),
+// and session token generation for both OMS and API sessions.
+//
+// Example usage with context:
+//
+//	client, err := kitesession.NewClient()
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+//	defer cancel()
+//
+//	session, err := client.GenerateSession(
+//	    ctx, userId, password, totpSecret, apiKey, apiSecret,
+//	)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	fmt.Printf("Access Token: %s\n", session.AccessToken)
 package kitesession
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -28,7 +52,8 @@ var defaultHeaders = map[string]string{
 	"x-kite-version": "3.0.0",
 }
 
-// KiteSession represents the session data returned by the Kite API
+// KiteSession represents the session data returned by the Kite API.
+// It contains authentication tokens, user profile information, and trading permissions.
 type KiteSession struct {
 	UserID        string         `json:"user_id"`
 	UserName      string         `json:"user_name,omitempty"`
@@ -50,19 +75,22 @@ type KiteSession struct {
 	Meta          map[string]any `json:"meta,omitempty"`
 }
 
-// KiteSessionError represents an error returned by the Kite API
+// KiteSessionError represents an error returned by the Kite API.
+// It includes the error code, type, and a descriptive message.
 type KiteSessionError struct {
 	ErrorCode int    `json:"error_code"`
 	ErrorType string `json:"error_type"`
 	Message   string `json:"message"`
 }
 
-// Error returns a string representation of the error
+// Error returns a string representation of the error.
+// It implements the error interface.
 func (e *KiteSessionError) Error() string {
 	return fmt.Sprintf("[%d] %s: %s", e.ErrorCode, e.ErrorType, e.Message)
 }
 
-// KiteSessionClient represents the client for the Kite API
+// KiteSessionClient represents the client for the Kite API.
+// It manages HTTP connections, session state, and authentication credentials.
 type KiteSessionClient struct {
 	UserID           string
 	Password         string
@@ -75,7 +103,8 @@ type KiteSessionClient struct {
 	client           *http.Client
 }
 
-// NewClient creates a new KiteSessionClient
+// NewClient creates a new KiteSessionClient with default configuration.
+// It initializes an HTTP client with cookie jar support and appropriate timeout settings.
 func NewClient() (*KiteSessionClient, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -93,7 +122,25 @@ func NewClient() (*KiteSessionClient, error) {
 	return client, nil
 }
 
-func (c *KiteSessionClient) GenerateSession(userId, password, totpSecret, apiKey, apiSecret string) (*KiteSession, error) {
+// GenerateSession generates a Kite session with context support.
+//
+// The context allows you to control timeouts and cancellation for the authentication flow.
+//
+// If apiKey and apiSecret are provided, it generates an API session (with access_token).
+// If apiKey and apiSecret are empty, it generates an OMS session (with enctoken only).
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - userId: Kite user ID
+//   - password: Kite password
+//   - totpSecret: TOTP secret for 2FA authentication
+//   - apiKey: API key (optional, leave empty for OMS session)
+//   - apiSecret: API secret (optional, leave empty for OMS session)
+//
+// Returns:
+//   - *KiteSession: Session data including tokens and user profile
+//   - error: Error if session generation fails
+func (c *KiteSessionClient) GenerateSession(ctx context.Context, userId, password, totpSecret, apiKey, apiSecret string) (*KiteSession, error) {
 	// set client credentials
 	c.UserID = userId
 	c.Password = password
@@ -102,23 +149,24 @@ func (c *KiteSessionClient) GenerateSession(userId, password, totpSecret, apiKey
 	c.APISecret = apiSecret
 
 	if apiKey == "" || apiSecret == "" {
-		return c.generateOMSSession()
+		return c.generateOMSSession(ctx)
 	}
 
-	return c.generateAPISession()
+	return c.generateAPISession(ctx)
 }
 
-// generateOMSSession generates a session token for the OMS
-func (c *KiteSessionClient) generateOMSSession() (*KiteSession, error) {
+// generateOMSSession generates a session token for the OMS with context support.
+// It performs the complete OMS authentication flow: login, 2FA, and profile retrieval.
+func (c *KiteSessionClient) generateOMSSession(ctx context.Context) (*KiteSession, error) {
 
 	// do login
-	loginResponse, loginCookies, err := c.doOMSSessionLogin()
+	loginResponse, loginCookies, err := c.doOMSSessionLogin(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// do twofa
-	_, twofaCookies, err := c.doOMSSessionTwoFA(loginResponse.Data.RequestID)
+	_, twofaCookies, err := c.doOMSSessionTwoFA(ctx, loginResponse.Data.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +175,7 @@ func (c *KiteSessionClient) generateOMSSession() (*KiteSession, error) {
 	c.Enctoken = getStringFromAny(getCookieValue(twofaCookies, "enctoken"))
 
 	// get user profile
-	userProfile, err := c.getUserProfile()
+	userProfile, err := c.getUserProfile(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -156,31 +204,31 @@ func (c *KiteSessionClient) generateOMSSession() (*KiteSession, error) {
 	return &kiteSession, nil
 }
 
-// generateAPISession generates a session token for the API
-func (c *KiteSessionClient) generateAPISession() (*KiteSession, error) {
+// generateAPISession generates a session token for the API with context support.
+// It performs the complete API authentication flow: session ID, OMS session, request token,
+// and session token generation.
+func (c *KiteSessionClient) generateAPISession(ctx context.Context) (*KiteSession, error) {
 
 	// get session id
-	sessID, kfSession, err := c.getSessID()
+	sessID, kfSession, err := c.getSessID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// get kf session from cookies
-
 	// generate oms session
-	omsSession, err := c.generateOMSSession()
+	omsSession, err := c.generateOMSSession(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// get request token
-	requestToken, err := c.getRequestToken(sessID)
+	requestToken, err := c.getRequestToken(ctx, sessID)
 	if err != nil {
 		return nil, err
 	}
 
 	// generate session token
-	sessionToken, err := c.generateSessionToken(requestToken)
+	sessionToken, err := c.generateSessionToken(ctx, requestToken)
 	if err != nil {
 		return nil, err
 	}
@@ -215,4 +263,27 @@ func (c *KiteSessionClient) generateAPISession() (*KiteSession, error) {
 
 	return &kiteSession, nil
 
+}
+
+// getStringFromAny safely converts any type to string.
+// Returns empty string if the value is nil or cannot be converted to string.
+func getStringFromAny(v any) string {
+	if v == nil {
+		return ""
+	}
+	if str, ok := v.(string); ok {
+		return str
+	}
+	return ""
+}
+
+// getCookieValue retrieves the value of a cookie by name from a slice of cookies.
+// Returns empty string if the cookie is not found.
+func getCookieValue(cookies []*http.Cookie, name string) string {
+	for _, cookie := range cookies {
+		if cookie.Name == name {
+			return cookie.Value
+		}
+	}
+	return ""
 }

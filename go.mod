@@ -2,10 +2,7 @@ module github.com/nsvirk/gokitesession
 
 go 1.24.3
 
-require (
-	github.com/joho/godotenv v1.5.1
-	github.com/pquerna/otp v1.5.0
-)
+require github.com/pquerna/otp v1.5.0
 
 require (
 	github.com/boombuler/barcode v1.0.2 // indirect

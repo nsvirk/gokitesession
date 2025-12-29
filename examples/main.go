@@ -1,21 +1,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
-	"github.com/joho/godotenv"
 	kitesession "github.com/nsvirk/gokitesession"
 )
 
 // go run examples/main.go
 func main() {
-	// Load environment variables
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	// Get environment variables
+	fmt.Println("--------------------------------------------------------------")
+	fmt.Println("Getting environment variables...")
+	fmt.Println("--------------------------------------------------------------")
 
 	userId := os.Getenv("KITE_USER_ID")
 	password := os.Getenv("KITE_PASSWORD")
@@ -23,26 +23,45 @@ func main() {
 	apiKey := os.Getenv("KITE_API_KEY")
 	apiSecret := os.Getenv("KITE_API_SECRET")
 
+	fmt.Println("KITE_USER_ID: ", userId)
+	fmt.Println("KITE_PASSWORD: ", password)
+	fmt.Println("KITE_TOTP_SECRET: ", totpSecret)
+	fmt.Println("KITE_API_KEY: ", apiKey)
+	fmt.Println("KITE_API_SECRET: ", apiSecret)
+
 	if userId == "" || password == "" || totpSecret == "" {
-		log.Fatal("Missing environment variables")
+		log.Fatal("Missing required environment variables: KITE_USER_ID, KITE_PASSWORD, KITE_TOTP_SECRET")
 	}
 
-	printKiteUser(userId, password, totpSecret, apiKey, apiSecret)
+	fmt.Println("--------------------------------------------------------------")
+	fmt.Println("Generating Kite session...")
+	fmt.Println("--------------------------------------------------------------")
 
-	// generate kitesession
+	// Create client
 	client, err := kitesession.NewClient()
 	if err != nil {
 		log.Fatal("Error creating client: ", err)
 	}
 
-	kiteSession, err := client.GenerateSession(userId, password, totpSecret, apiKey, apiSecret)
+	// Use context for timeout control
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Generate session with context
+	kiteSession, err := client.GenerateSession(
+		ctx, userId, password, totpSecret, apiKey, apiSecret,
+	)
 	if err != nil {
-		fmt.Println("--------------------------------")
-		fmt.Printf("error: %+v\n", err)
-		fmt.Printf("error_code: %v\n", client.KiteSessionError.ErrorCode)
-		fmt.Printf("error_type: %v\n", client.KiteSessionError.ErrorType)
-		fmt.Printf("error_message: %v\n", client.KiteSessionError.Message)
-		fmt.Println("--------------------------------")
+		fmt.Println("--------------------------------------------------------------")
+		fmt.Printf("Error generating session: %v\n", err)
+		if client.KiteSessionError != nil {
+			fmt.Printf("Kite API Error [%d] %s: %s\n",
+				client.KiteSessionError.ErrorCode,
+				client.KiteSessionError.ErrorType,
+				client.KiteSessionError.Message,
+			)
+		}
+		fmt.Println("--------------------------------------------------------------")
 		return
 	}
 
@@ -50,20 +69,7 @@ func main() {
 
 }
 
-// printKiteUser prints the kite user details
-func printKiteUser(userId, password, totpSecret, apiKey, apiSecret string) {
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Println("Kite User")
-	fmt.Println("--------------------------------------------------------------")
-	fmt.Printf("User Id      	: %s\n", userId)
-	fmt.Printf("Password     	: %s\n", password)
-	fmt.Printf("TwoFa Secret  	: %s\n", totpSecret)
-	fmt.Printf("API Key      	: %s\n", apiKey)
-	fmt.Printf("API Secret   	: %s\n", apiSecret)
-	fmt.Println("")
-}
-
-// printKiteSession prints the kite session details
+// printKiteSession prints the kite session details (safely, without exposing full tokens)
 func printKiteSession(ks *kitesession.KiteSession) {
 	fmt.Println("--------------------------------------------------------------")
 	if ks.APIKey == "" {
@@ -75,9 +81,20 @@ func printKiteSession(ks *kitesession.KiteSession) {
 	fmt.Printf("user_id        : %s\n", ks.UserID)
 	fmt.Printf("user_name      : %s\n", ks.UserName)
 	fmt.Printf("user_shortname : %s\n", ks.UserShortname)
-	fmt.Printf("public_token   : %s\n", ks.PublicToken)
-	fmt.Printf("kf_session     : %s\n", ks.KFSession)
-	fmt.Printf("enctoken       : %s\n", ks.Enctoken[:32]+"...")
+	// Show public token safely (truncated for security)
+	if len(ks.PublicToken) > 10 {
+		fmt.Printf("public_token   : %s...%s\n", ks.PublicToken[:5], ks.PublicToken[len(ks.PublicToken)-5:])
+	} else {
+		fmt.Printf("public_token   : %s\n", ks.PublicToken)
+	}
+
+	// Show tokens safely (truncated for security)
+	if len(ks.Enctoken) > 32 {
+		fmt.Printf("enctoken       : %s... (%d chars)\n", ks.Enctoken[:32], len(ks.Enctoken))
+	} else {
+		fmt.Printf("enctoken       : %s\n", ks.Enctoken)
+	}
+
 	fmt.Printf("login_time     : %s\n", ks.LoginTime)
 	fmt.Printf("user_type      : %s\n", ks.UserType)
 	fmt.Printf("email          : %s\n", ks.Email)
@@ -86,9 +103,26 @@ func printKiteSession(ks *kitesession.KiteSession) {
 	fmt.Printf("products       : %v\n", ks.Products)
 	fmt.Printf("order_types    : %v\n", ks.OrderTypes)
 	fmt.Printf("avatar_url     : %s\n", ks.AvatarURL)
-	fmt.Printf("api_key        : %s\n", ks.APIKey)
-	fmt.Printf("access_token   : %s\n", ks.AccessToken)
-	fmt.Printf("refresh_token  : %s\n", ks.RefreshToken)
+
+	// For API sessions, show API details
+	if ks.APIKey != "" {
+		fmt.Printf("api_key        : %s\n", ks.APIKey)
+
+		// Show access token safely (truncated)
+		if len(ks.AccessToken) > 20 {
+			fmt.Printf("access_token   : %s... (%d chars)\n", ks.AccessToken[:20], len(ks.AccessToken))
+		} else {
+			fmt.Printf("access_token   : %s\n", ks.AccessToken)
+		}
+
+		// Show refresh token safely (truncated)
+		if len(ks.RefreshToken) > 20 {
+			fmt.Printf("refresh_token  : %s... (%d chars)\n", ks.RefreshToken[:20], len(ks.RefreshToken))
+		} else {
+			fmt.Printf("refresh_token  : %s\n", ks.RefreshToken)
+		}
+	}
+
 	fmt.Printf("meta           : %v\n", ks.Meta)
 	fmt.Println("")
 	fmt.Println("--------------------------------------------------------------")
